@@ -1,0 +1,34 @@
+name: Handle App Update
+
+on:
+  repository_dispatch:
+    types: [app-update]
+jobs:
+  sync-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      - name: Sync Subtree
+        env:
+          APP_NAME: ${{ github.event.client_payload.app_name }}
+          REMOTE_URL: ${{ github.event.client_payload.remote_url }}
+        run: |
+          git remote add $APP_NAME $REMOTE_URL
+          git checkout -b update/$APP_NAME-${{ github.run_id }}
+          git subtree pull --prefix=apps/$APP_NAME $APP_NAME main --squash -m "Update $APP_NAME"
+          git push origin update/$APP_NAME-${{ github.run_id }}
+      - name: Create PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          APP_NAME: ${{ github.event.client_payload.app_name }}
+        run: |
+          gh pr create --title "Update $APP_NAME" --body "Auto-sync from $APP_NAME" --base main --head update/$APP_NAME-${{ github.run_id }}

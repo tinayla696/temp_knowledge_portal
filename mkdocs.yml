@@ -1,0 +1,7 @@
+site_name: Knowledge Portal (Project Name)
+theme:
+  name: material
+  language: ja
+nav:
+  - Home: index.md
+  # アプリ追加時にここにリンクを追記します
