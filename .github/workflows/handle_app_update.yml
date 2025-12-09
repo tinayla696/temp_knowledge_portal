@@ -3,32 +3,38 @@ name: Handle App Update
 on:
   repository_dispatch:
     types: [app-update]
+
 jobs:
   sync-pr:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pull-requests: write
+      contents: write       # コードをPushする権限
+      pull-requests: write  # PRを作成する権限
     steps:
       - uses: actions/checkout@v3
         with:
+          persist-credentials: false
           fetch-depth: 0
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Sync Subtree
         env:
+          MY_PAT: ${{ secrets.PROJECT_REPO_PAT }}
           APP_NAME: ${{ github.event.client_payload.app_name }}
-          REMOTE_URL: ${{ github.event.client_payload.remote_url }}
         run: |
-          git remote add $APP_NAME $REMOTE_URL
+          # Gitユーザー設定
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+          git remote add $APP_NAME https://$MY_PAT@github.com/${{ github.repository_owner }}/$APP_NAME.git
+          
           git checkout -b update/$APP_NAME-${{ github.run_id }}
           git subtree pull --prefix=apps/$APP_NAME $APP_NAME main --squash -m "Update $APP_NAME"
-          git push origin update/$APP_NAME-${{ github.run_id }}
+
+          git push https://$MY_PAT@github.com/${{ github.repository_owner }}/<portal_repo_name>.git update/$APP_NAME-${{ github.run_id }}
+
       - name: Create PR
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PROJECT_REPO_PAT }}
           APP_NAME: ${{ github.event.client_payload.app_name }}
         run: |
           gh pr create --title "Update $APP_NAME" --body "Auto-sync from $APP_NAME" --base main --head update/$APP_NAME-${{ github.run_id }}
