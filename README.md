@@ -1,78 +1,32 @@
-# Project Portal Template Repository
+# [Project Name] Portal Repository
 
-## 1. ポータル用テンプレート（`temp_knowledge_portal`）
+本リポジトリは、プロジェクト全体のドキュメントを集約し、統合ポータルサイトとして公開・管理するための親リポジトリです。
+**Docs as Code** の原則に基づき、アプリケーションリポジトリ（子）からの更新を自動で取り込みます。
 
-親リポジトリのひな形として、プロジェクトポータルのテンプレートを提供します。  
-このテンプレートは、プロジェクトポータルの基本的な構造と設定を含んでおり、新しいプロジェクトを迅速に開始するための基盤となります。
+## ⚠️ 重要: 運用ルール
+* [cite_start]**直接編集の禁止:** `apps/` ディレクトリ配下は自動同期されるため、本リポジトリで直接編集・コミットしないでください [cite: 565]。
+* [cite_start]**マージ戦略:** Pull Request は必ず **Squash and Merge** してください [cite: 543]。
+* [cite_start]**権限:** `main` ブランチへの直接 Push は禁止されています [cite: 452]。
 
-### ディレクトリ構成：
+## 🚀 プロジェクト立ち上げ手順 (管理者向け)
 
-```tree
-/
-├── .github/
-│   └── workflows/
-│       └── handle_app_update.yml  # [重要] 子からの更新を受け取るCI
-├── apps/                          # 各アプリのサブツリー配置場所
-├── docs/
-│   ├── index.md                   # ポータル表紙
-│   └── overrides/                 # (任意) カスタムCSS等
-├── .gitignore
-├── amplify.yml                    # Amplifyビルド設定
-├── mkdocs.yml                     # MkDocs設定
-├── README.md                      # このファイル
-└── requirements.txt               # 依存ライブラリ
-```
+### 1. リポジトリ作成
+このテンプレート (`temp_knowledge_portal`) から新規リポジトリを作成してください。
 
-#### 主要ファイルの中身
+### 2. Secrets設定
+[cite_start]`Settings` > `Secrets and variables` > `Actions` に以下を登録してください [cite: 474]。
+* **Name:** `PROJECT_REPO_PAT`
+* **Value:** 管理者の Personal Access Token (Repo権限付き)
 
-`.github/workflows/handle_app_update.yml`
+### 3. 子リポジトリの連携 (Subtree登録)
+[cite_start]ローカル環境で以下のコマンドを実行し、子リポジトリを登録します [cite: 480-483]。
 
-```yaml
-name: Handle App Update
-on:
-  repository_dispatch:
-    types: [app-update]
-jobs:
-  sync-pr:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - name: Configure Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-      - name: Sync Subtree
-        env:
-          APP_NAME: ${{ github.event.client_payload.app_name }}
-          REMOTE_URL: ${{ github.event.client_payload.remote_url }}
-        run: |
-          git remote add $APP_NAME $REMOTE_URL
-          git checkout -b update/$APP_NAME-${{ github.run_id }}
-          git subtree pull --prefix=apps/$APP_NAME $APP_NAME main --squash -m "Update $APP_NAME"
-          git push origin update/$APP_NAME-${{ github.run_id }}
-      - name: Create PR
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          APP_NAME: ${{ github.event.client_payload.app_name }}
-        run: |
-          gh pr create --title "Update $APP_NAME" --body "Auto-sync from $APP_NAME" --base main --head update/$APP_NAME-${{ github.run_id }}
-```
+```bash
+# 1. リモートの追加
+git remote add [アプリ名] [子リポジトリのURL]
 
-`mkdocs.yml`
+# 2. Subtreeの追加 (初回のみ)
+git subtree add --prefix=apps/[アプリ名] [アプリ名] main --squash
 
-```yaml
-site_name: Knowledge Portal (Project Name)
-theme:
-  name: material
-  language: ja
-nav:
-  - Home: index.md
-  # アプリ追加時にここにリンクを追記します
-```
-
----
+# 3. Push
+git push origin main
