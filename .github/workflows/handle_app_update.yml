@@ -1,40 +1,36 @@
 name: Handle App Update
-
 on:
   repository_dispatch:
     types: [app-update]
 
 jobs:
-  sync-pr:
+  update-subtree:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write       # コードをPushする権限
-      pull-requests: write  # PRを作成する権限
     steps:
       - uses: actions/checkout@v3
         with:
-          persist-credentials: false
           fetch-depth: 0
+          token: ${{ secrets.PROJECT_REPO_PAT }}
 
-      - name: Sync Subtree
-        env:
-          MY_PAT: ${{ secrets.PROJECT_REPO_PAT }}
-          APP_NAME: ${{ github.event.client_payload.app_name }}
+      - name: Configure Git
         run: |
-          # Gitユーザー設定
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          git remote add $APP_NAME https://$MY_PAT@github.com/${{ github.repository_owner }}/$APP_NAME.git
-          
-          git checkout -b update/$APP_NAME-${{ github.run_id }}
-          git subtree pull --prefix=apps/$APP_NAME $APP_NAME main --squash -m "Update $APP_NAME"
-
-          git push https://$MY_PAT@github.com/${{ github.repository_owner }}/<portal_repo_name>.git update/$APP_NAME-${{ github.run_id }}
-
-      - name: Create PR
+      - name: Pull Subtree
         env:
-          GH_TOKEN: ${{ secrets.PROJECT_REPO_PAT }}
           APP_NAME: ${{ github.event.client_payload.app_name }}
+          VERSION: ${{ github.event.client_payload.version }}
         run: |
-          gh pr create --title "Update $APP_NAME" --body "Auto-sync from $APP_NAME" --base main --head update/$APP_NAME-${{ github.run_id }}
+          # リモートが存在しない場合は追加 (初回のみ手動推奨だが、リカバリ用)
+          # ここでは既存のリモートからPullする想定
+          git subtree pull --prefix=apps/$APP_NAME $APP_NAME main --squash -m "chore($APP_NAME): update to $VERSION"
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.PROJECT_REPO_PAT }}
+          title: "chore: Update ${{ github.event.client_payload.app_name }} to ${{ github.event.client_payload.version }}"
+          body: "Auto-generated PR by Repository Dispatch."
+          branch: "chore/update-${{ github.event.client_payload.app_name }}"
+          base: main
