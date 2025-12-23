@@ -21,9 +21,12 @@ jobs:
         env:
           APP_NAME: ${{ github.event.client_payload.app_name }}
           VERSION: ${{ github.event.client_payload.version }}
+          OWNER: ${{ github.repository_owner }}
+          TOKEN: ${{ secrets.PROJECT_REPO_PAT }}
         run: |
-          # リモートが存在しない場合は追加 (初回のみ手動推奨だが、リカバリ用)
-          # ここでは既存のリモートからPullする想定
+          REPO_URL="https://x-access-token:${TOKEN}@github.com/${OWNER}/${APP_NAME}.git"
+          git remote add $APP_NAME $REPO_URL || git remote set-url $APP_NAME $REPO_URL
+          git fetch $APP_NAME main
           git subtree pull --prefix=apps/$APP_NAME $APP_NAME main --squash -m "chore($APP_NAME): update to $VERSION"
 
       - name: Create Pull Request
